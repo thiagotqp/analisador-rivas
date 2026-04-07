@@ -1,8 +1,7 @@
 services:
   - type: web
     name: analisador-rivas
-    runtime: python
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     plan: free
-    repo: https://github.com/thiagotqp/analisador-rivas
