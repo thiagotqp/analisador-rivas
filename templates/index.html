@@ -165,6 +165,80 @@
             return "prio-semanal";
         }
 
+        function extractUsername(input) {
+            input = input.trim().replace(/\/+$/, "");
+            const match = input.match(/instagram\.com\/([A-Za-z0-9._]+)/);
+            if (match) return match[1];
+            return input.replace(/^@/, "");
+        }
+
+        async function fetchInstagramProfile(username) {
+            // Tenta buscar via API mobile do Instagram direto do navegador
+            const urls = [
+                `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
+                `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
+            ];
+
+            for (const url of urls) {
+                try {
+                    const resp = await fetch(url, {
+                        headers: {
+                            "X-IG-App-ID": "936619743392459",
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                        credentials: "omit",
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data?.data?.user) return data.data.user;
+                    }
+                } catch (e) {
+                    console.log("Fetch failed for", url, e);
+                }
+            }
+            return null;
+        }
+
+        function extractProfileData(user) {
+            const posts = [];
+            const edges = user.edge_owner_to_timeline_media?.edges || [];
+            for (const edge of edges.slice(0, 12)) {
+                const node = edge.node || {};
+                const captionEdges = node.edge_media_to_caption?.edges || [];
+                const caption = captionEdges[0]?.node?.text || "";
+                posts.push({
+                    caption: caption,
+                    likes: node.edge_media_preview_like?.count || 0,
+                    comments: node.edge_media_to_comment?.count || 0,
+                    is_video: node.is_video || false,
+                    type: node.__typename || "",
+                    pinned: (node.pinned_for_users || []).length > 0,
+                });
+            }
+
+            const bioLinks = user.bio_links || [];
+            let externalUrl = user.external_url || "";
+            if (!externalUrl && bioLinks.length > 0) {
+                externalUrl = bioLinks[0]?.url || "";
+            }
+
+            return {
+                username: user.username,
+                full_name: user.full_name || "",
+                biography: user.biography || "",
+                external_url: externalUrl,
+                followers: user.edge_followed_by?.count || 0,
+                following: user.edge_follow?.count || 0,
+                posts_count: user.edge_owner_to_timeline_media?.count || 0,
+                is_verified: user.is_verified || false,
+                is_business: user.is_business_account || false,
+                category: user.category_name || "",
+                is_private: user.is_private || false,
+                profile_pic_url: user.profile_pic_url_hd || user.profile_pic_url || "",
+                posts: posts,
+            };
+        }
+
         async function analisarPerfil() {
             const input = document.getElementById("perfil-input").value.trim();
             if (!input) {
@@ -180,12 +254,39 @@
             document.getElementById("results").style.display = "none";
 
             try {
-                const resp = await fetch("/analisar", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ perfil: input }),
-                });
-                const data = await resp.json();
+                const username = extractUsername(input);
+
+                // Passo 1: Tenta buscar direto do navegador do usuario
+                let profileData = null;
+                const igUser = await fetchInstagramProfile(username);
+
+                if (igUser) {
+                    if (igUser.is_private) {
+                        showError(`O perfil @${username} é privado. Só é possível analisar perfis públicos.`);
+                        return;
+                    }
+                    profileData = extractProfileData(igUser);
+                }
+
+                let resp, data;
+
+                if (profileData) {
+                    // Passo 2A: Envia dados já extraidos para o servidor analisar
+                    resp = await fetch("/analisar", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ profile_data: profileData }),
+                    });
+                } else {
+                    // Passo 2B: Fallback - pede pro servidor buscar
+                    resp = await fetch("/analisar", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ perfil: input }),
+                    });
+                }
+
+                data = await resp.json();
 
                 if (!resp.ok || data.error) {
                     showError(data.error || "Erro desconhecido.");
@@ -194,7 +295,8 @@
 
                 renderResults(data);
             } catch (e) {
-                showError("Erro de conexão. Verifique se o servidor está rodando.");
+                console.error(e);
+                showError("Erro ao analisar. Verifique o username e tente novamente.");
             } finally {
                 btn.querySelector(".btn-text").style.display = "inline";
                 btn.querySelector(".btn-loading").style.display = "none";

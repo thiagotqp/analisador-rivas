@@ -22,12 +22,34 @@ def index():
 @app.route("/analisar", methods=["POST"])
 def analisar():
     data = request.get_json()
-    url_or_username = data.get("perfil", "").strip()
-
-    if not url_or_username:
-        return jsonify({"error": "Por favor, insira um link ou @username do Instagram."}), 400
 
     try:
+        # Modo 1: Dados já extraídos pelo navegador do usuário
+        profile_data = data.get("profile_data")
+        if profile_data:
+            profile = profile_data
+            results = analyze_profile(profile)
+            return jsonify({
+                "success": True,
+                "profile": {
+                    "username": profile.get("username", ""),
+                    "full_name": profile.get("full_name", ""),
+                    "profile_pic_url": profile.get("profile_pic_url", ""),
+                    "followers": profile.get("followers", 0),
+                    "following": profile.get("following", 0),
+                    "posts_count": profile.get("posts_count", 0),
+                    "biography": profile.get("biography", ""),
+                    "external_url": profile.get("external_url", ""),
+                    "category": profile.get("category", ""),
+                },
+                "analysis": results,
+            })
+
+        # Modo 2: Fallback - servidor busca os dados
+        url_or_username = data.get("perfil", "").strip()
+        if not url_or_username:
+            return jsonify({"error": "Por favor, insira um link ou @username do Instagram."}), 400
+
         username = extract_username(url_or_username)
         profile = scrape_profile(username)
         results = analyze_profile(profile)
