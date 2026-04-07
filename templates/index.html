@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Perfil | Método Rivas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <span class="logo-icon">&#9733;</span>
+                <span class="logo-text">Método Rivas</span>
+                <span class="logo-badge">Pilar 1</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+        <div class="container">
+            <h1>Análise de Perfil<br><span class="gradient-text">Método Rivas</span></h1>
+            <p class="subtitle">Descubra o que está impedindo seu Instagram de gerar leads qualificados. Análise completa baseada no Pilar 1: Autoridade e Posicionamento Digital.</p>
+
+            <div class="search-box">
+                <div class="input-wrapper">
+                    <span class="input-icon">@</span>
+                    <input type="text" id="perfil-input" placeholder="Cole o link do Instagram ou digite o @username" autocomplete="off">
+                </div>
+                <button id="btn-analisar" onclick="analisarPerfil()">
+                    <span class="btn-text">Analisar Perfil</span>
+                    <span class="btn-loading" style="display:none;">
+                        <span class="spinner"></span> Analisando...
+                    </span>
+                </button>
+            </div>
+
+            <p class="hint">Ex: https://instagram.com/seuarroba ou @seuarroba</p>
+            <div id="error-msg" class="error-msg" style="display:none;"></div>
+        </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="results-section" id="results" style="display:none;">
+        <div class="container">
+
+            <!-- Profile Card -->
+            <div class="profile-card" id="profile-card">
+                <div class="profile-header">
+                    <img id="profile-pic" src="" alt="Foto de perfil" class="profile-pic">
+                    <div class="profile-info">
+                        <h2 id="profile-name"></h2>
+                        <p id="profile-username" class="profile-username"></p>
+                        <p id="profile-category" class="profile-category"></p>
+                    </div>
+                </div>
+                <div class="profile-stats">
+                    <div class="stat"><span class="stat-number" id="stat-posts">0</span><span class="stat-label">Posts</span></div>
+                    <div class="stat"><span class="stat-number" id="stat-followers">0</span><span class="stat-label">Seguidores</span></div>
+                    <div class="stat"><span class="stat-number" id="stat-following">0</span><span class="stat-label">Seguindo</span></div>
+                </div>
+                <div class="profile-bio">
+                    <p id="profile-bio-text" class="bio-text"></p>
+                    <p id="profile-link" class="bio-link"></p>
+                </div>
+            </div>
+
+            <!-- Score Geral -->
+            <div class="score-card" id="score-card">
+                <div class="score-circle-wrapper">
+                    <div class="score-circle" id="score-circle">
+                        <span class="score-number" id="score-number">0</span>
+                        <span class="score-de">/10</span>
+                    </div>
+                </div>
+                <div class="score-info">
+                    <h3>Nota Geral</h3>
+                    <p class="score-classificacao" id="score-classificacao"></p>
+                    <p class="score-descricao">Análise baseada no Método Rivas - Pilar 1: Autoridade e Posicionamento Digital</p>
+                </div>
+            </div>
+
+            <!-- Score Grid -->
+            <div class="scores-grid" id="scores-grid"></div>
+
+            <!-- Detail Cards -->
+            <div id="detail-cards"></div>
+
+            <!-- Plano de Ação -->
+            <div class="plano-card" id="plano-card">
+                <h2 class="section-title">Plano de Ação</h2>
+                <p class="section-subtitle">Siga esse passo a passo para transformar seu perfil em uma máquina de gerar leads</p>
+                <div id="plano-lista"></div>
+            </div>
+
+            <!-- CTA Final -->
+            <div class="cta-final">
+                <p>"Quem não executa, esquece. Quem não executa, não tem resultado."</p>
+                <span class="cta-author">— Kaka Rivas</span>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container">
+            <p>Método Rivas &bull; Pilar 1: Autoridade e Posicionamento Digital</p>
+        </div>
+    </footer>
+
+    <script>
+        const LABELS = {
+            nome: "Nome do Perfil",
+            arroba: "Arroba (@)",
+            bio: "Bio Estratégica",
+            link: "Link na Bio",
+            fixados: "Posts Fixados",
+            editorial: "Linha Editorial",
+            engajamento: "Engajamento",
+            hashtags: "Hashtags",
+        };
+
+        const ICONS = {
+            nome: "&#128100;",
+            arroba: "&#64;",
+            bio: "&#128221;",
+            link: "&#128279;",
+            fixados: "&#128204;",
+            editorial: "&#128240;",
+            engajamento: "&#128200;",
+            hashtags: "#",
+        };
+
+        function formatNumber(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+            if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+            return n.toString();
+        }
+
+        function getScoreColor(score) {
+            if (score >= 8) return "#10b981";
+            if (score >= 6) return "#3b82f6";
+            if (score >= 4) return "#f59e0b";
+            if (score >= 2) return "#ef4444";
+            return "#991b1b";
+        }
+
+        function getScoreBg(score) {
+            if (score >= 8) return "rgba(16,185,129,0.1)";
+            if (score >= 6) return "rgba(59,130,246,0.1)";
+            if (score >= 4) return "rgba(245,158,11,0.1)";
+            if (score >= 2) return "rgba(239,68,68,0.1)";
+            return "rgba(153,27,27,0.1)";
+        }
+
+        function getPrioridadeClass(p) {
+            if (p === "URGENTE") return "prio-urgente";
+            if (p === "ALTA") return "prio-alta";
+            if (p === "MÉDIA") return "prio-media";
+            return "prio-semanal";
+        }
+
+        async function analisarPerfil() {
+            const input = document.getElementById("perfil-input").value.trim();
+            if (!input) {
+                showError("Por favor, insira um link ou @username do Instagram.");
+                return;
+            }
+
+            const btn = document.getElementById("btn-analisar");
+            btn.querySelector(".btn-text").style.display = "none";
+            btn.querySelector(".btn-loading").style.display = "inline-flex";
+            btn.disabled = true;
+            hideError();
+            document.getElementById("results").style.display = "none";
+
+            try {
+                const resp = await fetch("/analisar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ perfil: input }),
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || data.error) {
+                    showError(data.error || "Erro desconhecido.");
+                    return;
+                }
+
+                renderResults(data);
+            } catch (e) {
+                showError("Erro de conexão. Verifique se o servidor está rodando.");
+            } finally {
+                btn.querySelector(".btn-text").style.display = "inline";
+                btn.querySelector(".btn-loading").style.display = "none";
+                btn.disabled = false;
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById("error-msg");
+            el.textContent = msg;
+            el.style.display = "block";
+        }
+
+        function hideError() {
+            document.getElementById("error-msg").style.display = "none";
+        }
+
+        function renderResults(data) {
+            const { profile, analysis } = data;
+
+            // Profile Card
+            document.getElementById("profile-pic").src = profile.profile_pic_url;
+            document.getElementById("profile-name").textContent = profile.full_name;
+            document.getElementById("profile-username").textContent = "@" + profile.username;
+            document.getElementById("profile-category").textContent = profile.category || "";
+            document.getElementById("stat-posts").textContent = formatNumber(profile.posts_count);
+            document.getElementById("stat-followers").textContent = formatNumber(profile.followers);
+            document.getElementById("stat-following").textContent = formatNumber(profile.following);
+            document.getElementById("profile-bio-text").textContent = profile.biography || "(sem bio)";
+            document.getElementById("profile-link").textContent = profile.external_url || "Sem link na bio";
+            document.getElementById("profile-link").style.color = profile.external_url ? "#c6a75e" : "#ef4444";
+
+            // Score Geral
+            const nota = analysis.geral.nota;
+            const cor = getScoreColor(nota);
+            document.getElementById("score-number").textContent = nota;
+            document.getElementById("score-circle").style.borderColor = cor;
+            document.getElementById("score-number").style.color = cor;
+            document.getElementById("score-classificacao").textContent = analysis.geral.classificacao;
+            document.getElementById("score-classificacao").style.color = cor;
+
+            // Scores Grid
+            const grid = document.getElementById("scores-grid");
+            grid.innerHTML = "";
+            const scores = analysis.geral.scores;
+            for (const [key, score] of Object.entries(scores)) {
+                const color = getScoreColor(score);
+                const bg = getScoreBg(score);
+                grid.innerHTML += `
+                    <div class="score-item" style="border-left: 4px solid ${color}; background: ${bg};">
+                        <div class="score-item-header">
+                            <span class="score-item-icon">${ICONS[key] || ""}</span>
+                            <span class="score-item-label">${LABELS[key] || key}</span>
+                        </div>
+                        <div class="score-item-value" style="color: ${color};">${score}/10</div>
+                    </div>
+                `;
+            }
+
+            // Detail Cards
+            const details = document.getElementById("detail-cards");
+            details.innerHTML = "";
+
+            for (const key of ["bio", "nome", "link", "fixados", "editorial", "engajamento", "hashtags", "arroba"]) {
+                const item = analysis[key];
+                if (!item) continue;
+                const color = getScoreColor(item.score);
+
+                let content = "";
+
+                // Valor atual
+                if (item.valor_atual !== undefined) {
+                    content += `<div class="detail-current"><strong>Atual:</strong> <span class="current-value">${escapeHtml(String(item.valor_atual) || "(vazio)")}</span></div>`;
+                }
+
+                // Positivos
+                if (item.positivos && item.positivos.length > 0) {
+                    content += `<div class="detail-list positivos">`;
+                    for (const p of item.positivos) {
+                        content += `<div class="detail-item ok"><span class="check">&#10003;</span> ${escapeHtml(p)}</div>`;
+                    }
+                    content += `</div>`;
+                }
+
+                // Problemas
+                if (item.problemas && item.problemas.length > 0) {
+                    content += `<div class="detail-list problemas">`;
+                    for (const p of item.problemas) {
+                        content += `<div class="detail-item erro"><span class="x">&#10007;</span> ${escapeHtml(p)}</div>`;
+                    }
+                    content += `</div>`;
+                }
+
+                // Estrutura ideal (bio)
+                if (item.estrutura_ideal) {
+                    content += `<div class="detail-ideal"><strong>Estrutura ideal da Bio:</strong>
+                        <div class="ideal-lines">
+                            <div class="ideal-line"><span class="line-num">1</span> ${escapeHtml(item.estrutura_ideal.linha1)}</div>
+                            <div class="ideal-line"><span class="line-num">2</span> ${escapeHtml(item.estrutura_ideal.linha2)}</div>
+                            <div class="ideal-line"><span class="line-num">3</span> ${escapeHtml(item.estrutura_ideal.linha3)}</div>
+                            <div class="ideal-line"><span class="line-num">&#128279;</span> ${escapeHtml(item.estrutura_ideal.link)}</div>
+                        </div>
+                    </div>`;
+                }
+
+                // Distribuição editorial
+                if (item.distribuicao) {
+                    content += `<div class="editorial-dist">
+                        <strong>Distribuição atual vs ideal:</strong>
+                        <div class="dist-bars">`;
+                    const idealMap = {"educacional": 30, "autoridade": 20, "prova_social": 15, "imovel_venda": 10, "filosofia_motivacional": 0, "pessoal_generico": 0};
+                    const labelMap = {"educacional": "Educacional", "autoridade": "Autoridade", "prova_social": "Prova Social", "imovel_venda": "Imóvel/Venda", "filosofia_motivacional": "Filosofia/Motiv.", "pessoal_generico": "Pessoal/Genérico"};
+                    for (const [tipo, vals] of Object.entries(item.distribuicao)) {
+                        const ideal = idealMap[tipo] || 0;
+                        const pct = vals.pct || 0;
+                        const barColor = (tipo === "filosofia_motivacional" && pct > 20) ? "#ef4444" :
+                                         (tipo === "imovel_venda" && pct > 40) ? "#ef4444" :
+                                         (pct < ideal * 0.5 && ideal > 0) ? "#f59e0b" : "#10b981";
+                        content += `
+                            <div class="dist-row">
+                                <span class="dist-label">${labelMap[tipo] || tipo}</span>
+                                <div class="dist-bar-bg">
+                                    <div class="dist-bar" style="width: ${Math.min(pct, 100)}%; background: ${barColor};"></div>
+                                </div>
+                                <span class="dist-pct">${pct}%</span>
+                                <span class="dist-ideal">(ideal: ${ideal > 0 ? ideal + '%' : '-'})</span>
+                            </div>`;
+                    }
+                    content += `</div></div>`;
+                }
+
+                // Métricas de engajamento
+                if (item.metricas) {
+                    content += `<div class="metricas-grid">
+                        <div class="metrica"><span class="metrica-val">${item.metricas.taxa_engajamento}%</span><span class="metrica-label">Taxa Engajamento</span></div>
+                        <div class="metrica"><span class="metrica-val">${item.metricas.media_likes}</span><span class="metrica-label">Média Likes</span></div>
+                        <div class="metrica"><span class="metrica-val">${item.metricas.media_comentarios}</span><span class="metrica-label">Média Comentários</span></div>
+                    </div>`;
+                }
+
+                // Posts fixados detalhes
+                if (item.detalhes && item.detalhes.length > 0) {
+                    content += `<div class="fixados-detalhes">`;
+                    for (const d of item.detalhes) {
+                        const tipoLabel = {"prova_social": "Prova Social", "educacional": "Educacional", "autoridade": "Autoridade", "imovel": "Imóvel", "filosofia": "Filosofia/Motiv.", "pessoal": "Pessoal", "generico": "Genérico"};
+                        const tipoColor = {"prova_social": "#10b981", "educacional": "#3b82f6", "autoridade": "#8b5cf6", "imovel": "#f59e0b", "filosofia": "#ef4444", "pessoal": "#6b7280", "generico": "#6b7280"};
+                        content += `
+                            <div class="fixado-item">
+                                <div class="fixado-header">
+                                    <span class="fixado-num">Fixado ${d.numero}</span>
+                                    <span class="fixado-tipo" style="background: ${tipoColor[d.tipo] || '#6b7280'};">${tipoLabel[d.tipo] || d.tipo}</span>
+                                    <span class="fixado-stats">${d.likes} likes &bull; ${d.comments} comments</span>
+                                </div>
+                                <p class="fixado-preview">"${escapeHtml(d.preview)}"</p>
+                            </div>`;
+                    }
+                    content += `</div>`;
+                }
+
+                // Ideal fixados
+                if (item.ideal && key === "fixados") {
+                    content += `<div class="detail-ideal"><strong>Posts fixados ideais:</strong><div class="ideal-lines">`;
+                    for (const line of item.ideal) {
+                        content += `<div class="ideal-line"><span class="check" style="color:#c6a75e;">&#9733;</span> ${escapeHtml(line)}</div>`;
+                    }
+                    content += `</div></div>`;
+                }
+
+                // Sugestão
+                if (item.sugestao) {
+                    content += `<div class="detail-sugestao"><strong>Sugestão:</strong> ${escapeHtml(item.sugestao)}</div>`;
+                }
+
+                details.innerHTML += `
+                    <div class="detail-card">
+                        <div class="detail-card-header">
+                            <div class="detail-card-title">
+                                <span class="detail-icon">${ICONS[key] || ""}</span>
+                                <h3>${LABELS[key] || key}</h3>
+                            </div>
+                            <div class="detail-score" style="color: ${color}; border-color: ${color};">${item.score}/10</div>
+                        </div>
+                        <div class="detail-card-body">${content}</div>
+                    </div>
+                `;
+            }
+
+            // Plano de Ação
+            const planoLista = document.getElementById("plano-lista");
+            planoLista.innerHTML = "";
+            for (const item of analysis.geral.plano_acao) {
+                planoLista.innerHTML += `
+                    <div class="plano-item">
+                        <div class="plano-header">
+                            <span class="plano-prio ${getPrioridadeClass(item.prioridade)}">${item.prioridade}</span>
+                            <span class="plano-dia">${item.dia}</span>
+                        </div>
+                        <p class="plano-acao">${escapeHtml(item.acao)}</p>
+                        <p class="plano-motivo">${escapeHtml(item.motivo)}</p>
+                    </div>
+                `;
+            }
+
+            // Show results
+            document.getElementById("results").style.display = "block";
+            document.getElementById("results").scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Enter key
+        document.getElementById("perfil-input").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") analisarPerfil();
+        });
+    </script>
+</body>
+</html>
