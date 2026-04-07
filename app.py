@@ -1,10 +1,17 @@
 """Analisador de Perfil - Método Rivas Pilar 1."""
 
+import traceback
+import sys
 from flask import Flask, render_template, request, jsonify
 from scraper import scrape_profile, extract_username
 from analyzer import analyze_profile
 
 app = Flask(__name__)
+
+
+@app.errorhandler(500)
+def handle_500(e):
+    return jsonify({"error": "Erro interno do servidor. Tente novamente."}), 500
 
 
 @app.route("/")
@@ -42,6 +49,7 @@ def analisar():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
         return jsonify({"error": f"Erro inesperado: {str(e)}"}), 500
 
 
